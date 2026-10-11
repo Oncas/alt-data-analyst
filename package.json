@@ -1,0 +1,13 @@
+{
+  "name": "alt-data-analyst",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "scripts": {
+    "fetch": "tsx src/cli.ts fetch",
+    "screen": "tsx src/cli.ts screen",
+    "report": "tsx src/cli.ts report",
+    "typecheck": "tsc --noEmit",
+    "test": "vitest run"
+  }
+}
