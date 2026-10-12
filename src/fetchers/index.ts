@@ -17,6 +17,8 @@ export interface Fetcher {
   fetch(ctx: FetcherContext): Promise<FetchResult>;
 }
 
+import { usaspendingFetcher } from "./usaspending.js";
+
 // Registered as each source lands (PLAN.md phases 2-5):
 // usaspending, lda, edgar-form4, congress, edgar-13f
-export const fetchers: Fetcher[] = [];
+export const fetchers: Fetcher[] = [usaspendingFetcher];
