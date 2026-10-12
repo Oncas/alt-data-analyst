@@ -13,5 +13,7 @@ export interface Rule {
   run(ctx: RuleContext): number;
 }
 
+import { contractRules } from "./contracts.js";
+
 // Registered as each source's rules land (PLAN.md phases 2-5).
-export const rules: Rule[] = [];
+export const rules: Rule[] = [...contractRules];
