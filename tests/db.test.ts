@@ -7,6 +7,7 @@ import {
   setWatermark,
   type Db,
 } from "../src/db/index.js";
+import { migrations } from "../src/db/migrations.js";
 
 function memoryDb(): Db {
   const db = new Database(":memory:");
@@ -31,7 +32,7 @@ describe("migrations", () => {
     const applied = db
       .prepare("SELECT COUNT(*) AS n FROM schema_migrations")
       .get() as { n: number };
-    expect(applied.n).toBe(1);
+    expect(applied.n).toBe(migrations.length);
   });
 });
 
