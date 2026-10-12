@@ -1,12 +1,19 @@
 import { config } from "./config.js";
 import { openDb } from "./db/index.js";
 import { fetchers } from "./fetchers/index.js";
+import {
+  buildDigest,
+  fetchStateLines,
+  markSignalsReported,
+  unreportedSignals,
+} from "./report/digest.js";
 import { rules } from "./screen/index.js";
+import { todayIso } from "./util/dates.js";
 
 const [command, target] = process.argv.slice(2);
 
 function usage(): never {
-  console.log("Usage: tsx src/cli.ts <fetch|screen|report> [source]");
+  console.log("Usage: tsx src/cli.ts <fetch|screen|report> [source|preview]");
   process.exit(command ? 1 : 0);
 }
 
@@ -54,10 +61,15 @@ function runScreen(): void {
 
 function runReport(): void {
   const db = openDb(config.DB_PATH);
-  const row = db
-    .prepare("SELECT COUNT(*) AS n FROM signals WHERE reported_at IS NULL")
-    .get() as { n: number };
-  console.log(`${row.n} unreported signal(s). Digest formatting lands in Task 4.`);
+  const preview = target === "preview";
+  const signals = unreportedSignals(db);
+  console.log(
+    buildDigest(signals, { generatedAt: todayIso(), freshness: fetchStateLines(db) }),
+  );
+  if (!preview && signals.length > 0) {
+    markSignalsReported(db, signals.map((signal) => signal.id));
+    console.error(`(${signals.length} signal(s) marked reported; use "report preview" to peek without consuming)`);
+  }
 }
 
 switch (command) {
