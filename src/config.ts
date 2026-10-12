@@ -6,6 +6,7 @@ const schema = z.object({
   SEC_USER_AGENT: z.string().optional(),
   LDA_API_KEY: z.string().optional(),
   MIN_CONTRACT_USD: z.coerce.number().default(5_000_000),
+  MEGA_CONTRACT_USD: z.coerce.number().default(250_000_000),
 });
 
 export type Config = z.infer<typeof schema>;
