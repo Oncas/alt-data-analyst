@@ -7,6 +7,9 @@ const schema = z.object({
   LDA_API_KEY: z.string().optional(),
   MIN_CONTRACT_USD: z.coerce.number().default(5_000_000),
   MEGA_CONTRACT_USD: z.coerce.number().default(250_000_000),
+  LOBBY_MIN_USD: z.coerce.number().default(250_000),
+  // LDA general issue codes to watch (see /constants/filing/lobbyingactivityissues/).
+  WATCH_ISSUE_CODES: z.string().default("DEF,HOM,ENG,PHA,CPI"),
 });
 
 export type Config = z.infer<typeof schema>;
