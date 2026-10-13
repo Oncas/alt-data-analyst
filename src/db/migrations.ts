@@ -53,4 +53,28 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_contracts_recipient ON contracts (recipient);
     `,
   },
+  {
+    id: 3,
+    sql: `
+      CREATE TABLE lobbying_filings (
+        id INTEGER PRIMARY KEY,
+        filing_uuid TEXT NOT NULL UNIQUE,
+        filing_type TEXT,
+        filing_year INTEGER,
+        filing_period TEXT,
+        income REAL,
+        expenses REAL,
+        dt_posted TEXT NOT NULL,
+        registrant TEXT,
+        client TEXT,
+        client_description TEXT,
+        issue_codes TEXT NOT NULL DEFAULT '[]',
+        document_url TEXT,
+        fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX idx_lobbying_client ON lobbying_filings (client);
+      CREATE INDEX idx_lobbying_dt_posted ON lobbying_filings (dt_posted);
+    `,
+  },
 ];
