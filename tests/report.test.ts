@@ -8,6 +8,8 @@ import {
   markSignalsReported,
   unreportedSignals,
 } from "../src/report/digest.js";
+// Rule modules register their evidence formatters at import time.
+import "../src/screen/contracts.js";
 
 function memoryDb(): Db {
   const db = new Database(":memory:");
@@ -93,6 +95,18 @@ describe("buildDigest", () => {
     const digest = buildDigest([], { generatedAt: "2026-07-19", freshness: [] });
     expect(digest).toContain("No new signals since the last report.");
     expect(digest).toContain("not investment advice");
+  });
+
+  it("caps chatty rule groups and points to the signals table", () => {
+    const many = Array.from({ length: 20 }, (_, i) => ({
+      ...base,
+      id: i + 1,
+      rule: "chatty.rule",
+      evidence: "{}",
+    }));
+    const digest = buildDigest(many, { generatedAt: "2026-07-20", freshness: [] });
+    expect(digest).toContain("## chatty.rule (20)");
+    expect(digest).toContain("…and 5 more (see signals table)");
   });
 
   it("shows tickers next to companies when present", () => {

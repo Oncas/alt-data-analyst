@@ -1,8 +1,25 @@
 import { insertSignal, type SignalInput } from "../db/index.js";
+import { fmtUsd, registerEvidenceFormatter } from "../report/digest.js";
 import { shiftDate } from "../util/dates.js";
 import type { Rule, RuleContext } from "./index.js";
 
 const SOURCE = "usaspending";
+
+registerEvidenceFormatter("contracts.mega-award", (e) =>
+  `${fmtUsd(Number(e.amount))} — ${e.agency ?? "unknown agency"} — ` +
+  `${String(e.description ?? "").trim() || "no description"} ` +
+  `(award ${e.awardId}, ${e.actionDate})`,
+);
+registerEvidenceFormatter("contracts.new-large-recipient", (e) =>
+  `first seen ${e.firstSeen}: ${e.awardCount} award(s) totaling ${fmtUsd(Number(e.totalUsd))}, ` +
+  `largest ${fmtUsd(Number(e.largestAwardUsd))}` +
+  // Evidence written by older rule versions may lack fields — degrade, don't print "undefined".
+  (e.baselineSince ? ` (caveat: our data only goes back to ${e.baselineSince})` : ""),
+);
+registerEvidenceFormatter("contracts.spend-spike", (e) =>
+  `${fmtUsd(Number(e.currentWindowUsd))} in last ${e.windowDays}d vs ` +
+  `${fmtUsd(Number(e.priorWindowUsd))} prior — ${e.ratio}x`,
+);
 
 // Rule parameters. User-tunable ones live in config (see docs/DECISIONS.md D2);
 // these shape rule mechanics and are exported so tests pin them down.

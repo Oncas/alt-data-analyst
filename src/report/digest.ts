@@ -38,32 +38,25 @@ export function fetchStateLines(db: Db): string[] {
   );
 }
 
+const MAX_LINES_PER_RULE = 15;
+
 export function fmtUsd(value: number): string {
   if (Math.abs(value) >= 1e9) return `$${(value / 1e9).toFixed(2)}B`;
   if (Math.abs(value) >= 1e6) return `$${(value / 1e6).toFixed(1)}M`;
   return `$${Math.round(value).toLocaleString("en-US")}`;
 }
 
-type Evidence = Record<string, unknown>;
-type EvidenceFormatter = (evidence: Evidence) => string;
+export type Evidence = Record<string, unknown>;
+export type EvidenceFormatter = (evidence: Evidence) => string;
 
-// Per-rule one-line evidence renderers. New rules may add an entry here for a
-// nicer line; anything unlisted falls back to compact JSON (open for extension,
-// no digest changes required).
-const evidenceFormatters: Record<string, EvidenceFormatter> = {
-  "contracts.mega-award": (e) =>
-    `${fmtUsd(Number(e.amount))} — ${e.agency ?? "unknown agency"} — ` +
-    `${String(e.description ?? "").trim() || "no description"} ` +
-    `(award ${e.awardId}, ${e.actionDate})`,
-  "contracts.new-large-recipient": (e) =>
-    `first seen ${e.firstSeen}: ${e.awardCount} award(s) totaling ${fmtUsd(Number(e.totalUsd))}, ` +
-    `largest ${fmtUsd(Number(e.largestAwardUsd))}` +
-    // Evidence written by older rule versions may lack fields — degrade, don't print "undefined".
-    (e.baselineSince ? ` (caveat: our data only goes back to ${e.baselineSince})` : ""),
-  "contracts.spend-spike": (e) =>
-    `${fmtUsd(Number(e.currentWindowUsd))} in last ${e.windowDays}d vs ` +
-    `${fmtUsd(Number(e.priorWindowUsd))} prior — ${e.ratio}x`,
-};
+// Per-rule one-line evidence renderers. Rule modules register their own via
+// registerEvidenceFormatter at import time; anything unregistered falls back to
+// compact JSON — the digest never needs editing for a new rule.
+const evidenceFormatters: Record<string, EvidenceFormatter> = {};
+
+export function registerEvidenceFormatter(rule: string, formatter: EvidenceFormatter): void {
+  evidenceFormatters[rule] = formatter;
+}
 
 export function formatEvidence(rule: string, evidenceJson: string): string {
   let evidence: Evidence;
@@ -101,11 +94,17 @@ export function buildDigest(
 
     for (const [rule, group] of byRule) {
       lines.push(`## ${rule} (${group.length})`, "");
-      for (const signal of group) {
+      // Groups are pre-sorted by severity; cap the listing so one chatty rule
+      // can't swamp the digest (full detail stays queryable in the signals table).
+      const shown = group.slice(0, MAX_LINES_PER_RULE);
+      for (const signal of shown) {
         const who = signal.ticker
           ? `${signal.company ?? "?"} [${signal.ticker}]`
           : (signal.company ?? "?");
         lines.push(`- [sev ${signal.severity}] **${who}** — ${formatEvidence(rule, signal.evidence)}`);
+      }
+      if (group.length > shown.length) {
+        lines.push(`- …and ${group.length - shown.length} more (see signals table)`);
       }
       lines.push("");
     }
