@@ -77,4 +77,31 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_lobbying_dt_posted ON lobbying_filings (dt_posted);
     `,
   },
+  {
+    id: 4,
+    sql: `
+      CREATE TABLE insider_trades (
+        id INTEGER PRIMARY KEY,
+        accession TEXT NOT NULL,
+        txn_index INTEGER NOT NULL,
+        ticker TEXT,
+        issuer_name TEXT,
+        issuer_cik TEXT,
+        insider_name TEXT,
+        insider_role TEXT,
+        transaction_code TEXT NOT NULL,
+        transaction_date TEXT,
+        shares REAL,
+        price REAL,
+        value REAL,
+        acquired_disposed TEXT,
+        filed_at TEXT,
+        fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (accession, txn_index)
+      );
+
+      CREATE INDEX idx_insider_ticker ON insider_trades (ticker);
+      CREATE INDEX idx_insider_txn_date ON insider_trades (transaction_date);
+    `,
+  },
 ];
