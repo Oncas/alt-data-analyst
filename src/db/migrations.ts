@@ -104,4 +104,36 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_insider_txn_date ON insider_trades (transaction_date);
     `,
   },
+  {
+    id: 5,
+    sql: `
+      CREATE TABLE congress_trades (
+        id INTEGER PRIMARY KEY,
+        source_id TEXT NOT NULL UNIQUE,
+        filer_name TEXT NOT NULL,
+        chamber TEXT,
+        party TEXT,
+        state TEXT,
+        office TEXT,
+        owner TEXT,
+        ticker TEXT,
+        asset_name TEXT,
+        asset_type TEXT,
+        transaction_type TEXT,
+        transaction_date TEXT,
+        filing_date TEXT,
+        amount_low REAL,
+        amount_high REAL,
+        amount_label TEXT,
+        days_to_file INTEGER,
+        is_late INTEGER,
+        doc_url TEXT,
+        fetched_at TEXT NOT NULL DEFAULT (datetime('now'))
+      );
+
+      CREATE INDEX idx_congress_ticker ON congress_trades (ticker);
+      CREATE INDEX idx_congress_txn_date ON congress_trades (transaction_date);
+      CREATE INDEX idx_congress_filer ON congress_trades (filer_name);
+    `,
+  },
 ];
