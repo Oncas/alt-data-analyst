@@ -86,6 +86,10 @@ export function mapForm4(xml: string, accession: string, filedAt: string | null)
     String(leaf(firstOwner.reportingOwnerId?.rptOwnerName) ?? "").trim() || null;
   const insiderRole = describeRole(firstOwner.reportingOwnerRelationship);
 
+  // Non-listed issuers file placeholder symbols — treat them as no ticker.
+  const tickerRaw = String(leaf(issuer.issuerTradingSymbol) ?? "").trim().toUpperCase();
+  const ticker = tickerRaw && !["NONE", "N/A", "NA"].includes(tickerRaw) ? tickerRaw : null;
+
   const transactions = asArray(ownership.nonDerivativeTable?.nonDerivativeTransaction);
   const rows: InsiderTradeRow[] = [];
   transactions.forEach((txn: Record<string, any>, index: number) => {
@@ -96,7 +100,7 @@ export function mapForm4(xml: string, accession: string, filedAt: string | null)
     rows.push({
       accession,
       txnIndex: index,
-      ticker: String(leaf(issuer.issuerTradingSymbol) ?? "").trim().toUpperCase() || null,
+      ticker,
       issuerName: String(leaf(issuer.issuerName) ?? "").trim() || null,
       issuerCik: String(leaf(issuer.issuerCik) ?? "").trim() || null,
       insiderName,

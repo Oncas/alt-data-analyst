@@ -75,6 +75,14 @@ describe("mapForm4", () => {
     expect(mapForm4("<ownershipDocument><issuer/></ownershipDocument>", "acc", null)).toEqual([]);
   });
 
+  it("treats placeholder trading symbols as no ticker", () => {
+    const none = form4Xml.replace(
+      "<issuerTradingSymbol>aapl</issuerTradingSymbol>",
+      "<issuerTradingSymbol>NONE</issuerTradingSymbol>",
+    );
+    expect(mapForm4(none, "acc", null)[0]?.ticker).toBeNull();
+  });
+
   it("handles missing price (value stays null)", () => {
     const noPrice = form4Xml.replace(
       "<transactionPricePerShare><value>212.50</value></transactionPricePerShare>",
