@@ -14,7 +14,8 @@ export interface Rule {
 }
 
 import { contractRules } from "./contracts.js";
+import { insiderRules } from "./insiders.js";
 import { lobbyingRules } from "./lobbying.js";
 
 // Registered as each source's rules land (PLAN.md phases 2-5).
-export const rules: Rule[] = [...contractRules, ...lobbyingRules];
+export const rules: Rule[] = [...contractRules, ...lobbyingRules, ...insiderRules];

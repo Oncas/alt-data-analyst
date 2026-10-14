@@ -8,6 +8,7 @@ const schema = z.object({
   MIN_CONTRACT_USD: z.coerce.number().default(5_000_000),
   MEGA_CONTRACT_USD: z.coerce.number().default(250_000_000),
   LOBBY_MIN_USD: z.coerce.number().default(250_000),
+  INSIDER_BIG_BUY_USD: z.coerce.number().default(250_000),
   // LDA general issue codes to watch (see /constants/filing/lobbyingactivityissues/).
   WATCH_ISSUE_CODES: z.string().default("DEF,HOM,ENG,PHA,CPI"),
 });
