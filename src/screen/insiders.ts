@@ -1,7 +1,7 @@
 import { insertSignal, type SignalInput } from "../db/index.js";
 import { fmtUsd, registerEvidenceFormatter } from "../report/digest.js";
-import { normalizeCompanyName } from "../util/companies.js";
 import { shiftDate } from "../util/dates.js";
+import { buildSignalIndex, matchSignal, type OtherSignalRef } from "./crossSource.js";
 import type { Rule, RuleContext } from "./index.js";
 
 const SOURCE = "edgar-form4";
@@ -108,35 +108,19 @@ export function bigExecBuySignals(buys: InsiderBuy[], minUsd: number): SignalInp
     }));
 }
 
-export interface OtherSignalRef {
-  source: string;
-  rule: string;
-  company: string | null;
-  ticker: string | null;
-}
-
 /**
  * Insider buy at a company independently flagged by another source recently.
- * Joins on ticker when the other signal has one, else on normalized company
- * name (conservative — see util/companies.ts).
+ * Join semantics shared via crossSource.ts (ticker first, conservative name fallback).
  */
 export function crossSourceBuySignals(
   buys: InsiderBuy[],
   others: OtherSignalRef[],
   minUsd: number,
 ): SignalInput[] {
-  const byTicker = new Map<string, OtherSignalRef>();
-  const byName = new Map<string, OtherSignalRef>();
-  for (const other of others) {
-    if (other.ticker) byTicker.set(other.ticker.toUpperCase(), other);
-    if (other.company) byName.set(normalizeCompanyName(other.company), other);
-  }
-
+  const index = buildSignalIndex(others);
   return buys.flatMap((buy) => {
     if (buy.value === null || buy.value < minUsd) return [];
-    const match =
-      (buy.ticker ? byTicker.get(buy.ticker.toUpperCase()) : undefined) ??
-      (buy.issuerName ? byName.get(normalizeCompanyName(buy.issuerName)) : undefined);
+    const match = matchSignal(index, buy.ticker, buy.issuerName);
     if (!match) return [];
     return [
       {
