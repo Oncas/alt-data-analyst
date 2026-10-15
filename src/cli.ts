@@ -1,5 +1,6 @@
 import { config } from "./config.js";
 import { openDb } from "./db/index.js";
+import { enrichSignalTickers } from "./enrich/tickers.js";
 import { fetchers } from "./fetchers/index.js";
 import {
   buildDigest,
@@ -57,6 +58,8 @@ function runScreen(): void {
     const count = rule.run({ db, config });
     console.log(`${rule.name}: ${count} new signal(s)`);
   }
+  const filled = enrichSignalTickers(db);
+  if (filled > 0) console.log(`ticker enrichment: ${filled} signal(s) resolved to tickers`);
 }
 
 function runReport(): void {
