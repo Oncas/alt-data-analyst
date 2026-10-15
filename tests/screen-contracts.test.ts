@@ -37,6 +37,33 @@ function seedContract(
   ).run(key, `AW-${key}`, recipient, amount, actionDate);
 }
 
+/** Make a recipient resolvable; the argument is the *normalized* name. */
+function seedTicker(db: Db, normalizedName: string, ticker: string): void {
+  db.prepare(
+    "INSERT OR IGNORE INTO company_tickers (normalized_name, ticker) VALUES (?, ?)",
+  ).run(normalizedName, ticker);
+}
+
+function signalsByRule(db: Db): Record<string, { severity: number; ticker: string | null }[]> {
+  const rows = db
+    .prepare("SELECT rule, severity, ticker FROM signals ORDER BY rule, dedupe_key")
+    .all() as { rule: string; severity: number; ticker: string | null }[];
+  const out: Record<string, { severity: number; ticker: string | null }[]> = {};
+  for (const { rule, severity, ticker } of rows) {
+    (out[rule] ??= []).push({ severity, ticker });
+  }
+  return out;
+}
+
+/** Baseline history plus one mega award and one brand-new large recipient. */
+function seedStandardContracts(db: Db): void {
+  seedContract(db, "old1", "STALWART INC", 8_000_000, "2026-01-10");
+  seedContract(db, "old2", "SPIKECO", 6_000_000, "2026-02-15");
+  seedContract(db, "mega", "BIGCO", 400_000_000, "2026-07-10");
+  seedContract(db, "new1", "FRESHCO", 22_000_000, "2026-07-12");
+  seedContract(db, "sp1", "SPIKECO", 30_000_000, "2026-07-01");
+}
+
 const megaRow: MegaAwardRow = {
   naturalKey: "usa:1",
   awardId: "AW1",
@@ -126,20 +153,87 @@ describe("contractRules end-to-end", () => {
   it("produces signals from seeded data and is idempotent on re-run", () => {
     const db = memoryDb();
     const config = testConfig();
-    // Baseline history (well before any window), then recent activity.
-    seedContract(db, "old1", "STALWART INC", 8_000_000, "2026-01-10");
-    seedContract(db, "old2", "SPIKECO", 6_000_000, "2026-02-15");
-    // Mega award.
-    seedContract(db, "mega", "BIGCO", 400_000_000, "2026-07-10");
-    // New recipient inside the 14-day window with > $20M.
-    seedContract(db, "new1", "FRESHCO", 22_000_000, "2026-07-12");
-    // Spike: prior window ~Feb-Apr vs current window Apr-Jul.
-    seedContract(db, "sp1", "SPIKECO", 30_000_000, "2026-07-01");
+    // Recipients must resolve, or the gated rule drops them (see gating tests).
+    seedTicker(db, "BIGCO", "BIG");
+    seedTicker(db, "FRESHCO", "FRSH");
+    seedStandardContracts(db);
 
     const firstRun = contractRules.map((rule) => rule.run({ db, config }));
     expect(firstRun.reduce((a, b) => a + b, 0)).toBeGreaterThanOrEqual(2);
 
     const secondRun = contractRules.map((rule) => rule.run({ db, config }));
     expect(secondRun.reduce((a, b) => a + b, 0)).toBe(0);
+  });
+
+  it("stamps the ticker at creation time and keeps severity when the recipient resolves", () => {
+    const db = memoryDb();
+    const config = testConfig();
+    seedTicker(db, "BIGCO", "BIG");
+    seedTicker(db, "FRESHCO", "FRSH");
+    seedStandardContracts(db);
+
+    contractRules.map((rule) => rule.run({ db, config }));
+
+    expect(signalsByRule(db)).toEqual({
+      // $400M => severity 2, undemoted because the recipient resolved.
+      "contracts.mega-award": [{ severity: 2, ticker: "BIG" }],
+      // BIGCO is also first-seen inside the window, alongside FRESHCO.
+      "contracts.new-large-recipient": [
+        { severity: 2, ticker: "BIG" },
+        { severity: 2, ticker: "FRSH" },
+      ],
+      // Not policy-governed: passes through with no ticker until enrichment.
+      "contracts.spend-spike": [{ severity: 2, ticker: null }],
+    });
+  });
+});
+
+describe("contracts ticker gating", () => {
+  it("drops new-large-recipient signals whose recipient has no public ticker", () => {
+    const db = memoryDb();
+    const config = testConfig();
+    seedStandardContracts(db);
+
+    contractRules.map((rule) => rule.run({ db, config }));
+
+    const byRule = signalsByRule(db);
+    expect(byRule["contracts.new-large-recipient"]).toBeUndefined();
+  });
+
+  it("demotes rather than drops an unresolvable mega award", () => {
+    const db = memoryDb();
+    const config = testConfig();
+    seedStandardContracts(db);
+
+    contractRules.map((rule) => rule.run({ db, config }));
+
+    // A $400M award to a private recipient is still context worth keeping.
+    expect(signalsByRule(db)["contracts.mega-award"]).toEqual([{ severity: 1, ticker: null }]);
+  });
+
+  it("gates on resolution independently per recipient", () => {
+    const db = memoryDb();
+    const config = testConfig();
+    seedTicker(db, "FRESHCO", "FRSH"); // BIGCO deliberately left unresolvable
+    seedStandardContracts(db);
+
+    contractRules.map((rule) => rule.run({ db, config }));
+
+    expect(signalsByRule(db)["contracts.new-large-recipient"]).toEqual([
+      { severity: 2, ticker: "FRSH" },
+    ]);
+    expect(signalsByRule(db)["contracts.mega-award"]).toEqual([{ severity: 1, ticker: null }]);
+  });
+
+  it("goes quiet on gated rules when company_tickers is empty, without crashing", () => {
+    const db = memoryDb(); // company_tickers exists but has no rows
+    const config = testConfig();
+    seedStandardContracts(db);
+
+    expect(() => contractRules.map((rule) => rule.run({ db, config }))).not.toThrow();
+    expect(Object.keys(signalsByRule(db)).sort()).toEqual([
+      "contracts.mega-award",
+      "contracts.spend-spike",
+    ]);
   });
 });

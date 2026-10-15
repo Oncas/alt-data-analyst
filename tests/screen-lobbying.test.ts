@@ -104,43 +104,71 @@ describe("quarterlySpikeSignals", () => {
   });
 });
 
-describe("lobbyingRules end-to-end", () => {
-  function seedFiling(
-    db: Db,
-    uuid: string,
-    overrides: Partial<Record<string, unknown>> = {},
-  ): void {
-    const row = {
-      uuid,
-      type: "Q2",
-      year: 2026,
-      period: "second_quarter",
-      income: 400_000,
-      expenses: null,
-      dt: "2026-07-18T12:00:00-04:00",
-      registrant: "Lobby Shop LLC",
-      client: "Acme Robotics",
-      desc: "robots",
-      codes: JSON.stringify(["DEF"]),
-      ...overrides,
-    };
-    db.prepare(
-      `INSERT INTO lobbying_filings
-         (filing_uuid, filing_type, filing_year, filing_period, income, expenses,
-          dt_posted, registrant, client, client_description, issue_codes)
-       VALUES (@uuid, @type, @year, @period, @income, @expenses, @dt, @registrant,
-               @client, @desc, @codes)`,
-    ).run(row);
-  }
+// ---------- end-to-end helpers ----------
 
+function memoryDb(): Db {
+  const db = new Database(":memory:") as Db;
+  migrate(db);
+  return db;
+}
+
+function testConfig(): Config {
+  return {
+    DB_PATH: ":memory:",
+    LOBBY_MIN_USD: 250_000,
+    WATCH_ISSUE_CODES: "DEF,PHA",
+  } as Config;
+}
+
+/** Make a client resolvable; the argument is the *normalized* name. */
+function seedTicker(db: Db, normalizedName: string, ticker: string): void {
+  db.prepare(
+    "INSERT OR IGNORE INTO company_tickers (normalized_name, ticker) VALUES (?, ?)",
+  ).run(normalizedName, ticker);
+}
+
+function seedFiling(db: Db, uuid: string, overrides: Partial<Record<string, unknown>> = {}): void {
+  const row = {
+    uuid,
+    type: "Q2",
+    year: 2026,
+    period: "second_quarter",
+    income: 400_000,
+    expenses: null,
+    dt: "2026-07-18T12:00:00-04:00",
+    registrant: "Lobby Shop LLC",
+    client: "Acme Robotics",
+    desc: "robots",
+    codes: JSON.stringify(["DEF"]),
+    ...overrides,
+  };
+  db.prepare(
+    `INSERT INTO lobbying_filings
+       (filing_uuid, filing_type, filing_year, filing_period, income, expenses,
+        dt_posted, registrant, client, client_description, issue_codes)
+     VALUES (@uuid, @type, @year, @period, @income, @expenses, @dt, @registrant,
+             @client, @desc, @codes)`,
+  ).run(row);
+}
+
+function signalsByRule(db: Db): Record<string, { severity: number; ticker: string | null }[]> {
+  const rows = db
+    .prepare("SELECT rule, severity, ticker FROM signals ORDER BY rule, dedupe_key")
+    .all() as { rule: string; severity: number; ticker: string | null }[];
+  const out: Record<string, { severity: number; ticker: string | null }[]> = {};
+  for (const { rule, severity, ticker } of rows) {
+    (out[rule] ??= []).push({ severity, ticker });
+  }
+  return out;
+}
+
+describe("lobbyingRules end-to-end", () => {
   it("produces signals from seeded data and is idempotent", () => {
-    const db = new Database(":memory:") as Db;
-    migrate(db);
-    const config = {
-      DB_PATH: ":memory:",
-      LOBBY_MIN_USD: 250_000,
-      WATCH_ISSUE_CODES: "DEF,PHA",
-    } as Config;
+    const db = memoryDb();
+    const config = testConfig();
+    // Both flagged clients must resolve, or the gated/demoted rules change shape.
+    seedTicker(db, "ACME ROBOTICS", "ACME");
+    seedTicker(db, "FRESH STARTUP", "FRSH");
 
     seedFiling(db, "w1"); // watched-issue hit
     seedFiling(db, "r1", { type: "RR", income: null, client: "Fresh Startup Inc" });
@@ -154,5 +182,63 @@ describe("lobbyingRules end-to-end", () => {
 
     const second = lobbyingRules.map((rule) => rule.run({ db, config }));
     expect(second.reduce((a, b) => a + b, 0)).toBe(0);
+  });
+
+  it("stamps the ticker at creation time and keeps severity when the client resolves", () => {
+    const db = memoryDb();
+    const config = testConfig();
+    seedTicker(db, "ACME ROBOTICS", "ACME");
+    seedFiling(db, "w1");
+    seedFiling(db, "r1", { type: "RR", income: null });
+
+    lobbyingRules.map((rule) => rule.run({ db, config }));
+
+    expect(signalsByRule(db)).toEqual({
+      // $400k => severity 2, undemoted because the client resolved.
+      "lobbying.watched-issue": [{ severity: 2, ticker: "ACME" }],
+      "lobbying.new-registration": [{ severity: 1, ticker: "ACME" }],
+    });
+  });
+});
+
+describe("lobbying ticker gating", () => {
+  it("drops new-registration signals whose client has no public ticker", () => {
+    const db = memoryDb();
+    const config = testConfig();
+    seedFiling(db, "r1", {
+      type: "RR",
+      income: null,
+      client: "Chippewa Valley Community College",
+      codes: "[]",
+    });
+
+    const counts = lobbyingRules.map((rule) => rule.run({ db, config }));
+    expect(counts.reduce((a, b) => a + b, 0)).toBe(0);
+    expect(signalsByRule(db)).toEqual({});
+  });
+
+  it("demotes rather than drops an unresolvable watched-issue filing", () => {
+    const db = memoryDb();
+    const config = testConfig();
+    seedFiling(db, "w1", { client: "Rural County Memorial Fund", income: 1_500_000 });
+
+    lobbyingRules.map((rule) => rule.run({ db, config }));
+
+    // $1.5M would be severity 3; unresolvable knocks it to 2 but keeps it.
+    expect(signalsByRule(db)).toEqual({
+      "lobbying.watched-issue": [{ severity: 2, ticker: null }],
+    });
+  });
+
+  it("goes quiet on gated rules when company_tickers is empty, without crashing", () => {
+    const db = memoryDb(); // company_tickers exists but has no rows
+    const config = testConfig();
+    seedFiling(db, "w1"); // watched-issue, severity 2 -> demoted to 1
+    seedFiling(db, "r1", { type: "RR", income: null, client: "Fresh Startup Inc" });
+
+    expect(() => lobbyingRules.map((rule) => rule.run({ db, config }))).not.toThrow();
+    expect(signalsByRule(db)).toEqual({
+      "lobbying.watched-issue": [{ severity: 1, ticker: null }],
+    });
   });
 });

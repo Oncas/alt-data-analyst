@@ -1,6 +1,7 @@
 import { insertSignal, type SignalInput } from "../db/index.js";
 import { fmtUsd, registerEvidenceFormatter } from "../report/digest.js";
 import type { Rule, RuleContext } from "./index.js";
+import { applyTickerPolicy, createTickerResolver } from "./tickerPolicy.js";
 
 const SOURCE = "lda";
 
@@ -132,8 +133,13 @@ const PERIOD_ORDER: Record<string, number> = {
   year_end: 4,
 };
 
+/**
+ * One resolver per call, and persist() is called once per rule run — so the
+ * overrides file is read once per rule, not once per candidate row.
+ */
 function persist(ctx: RuleContext, signals: SignalInput[]): number {
-  return signals.filter((signal) => insertSignal(ctx.db, signal)).length;
+  const screened = applyTickerPolicy(signals, createTickerResolver(ctx.db));
+  return screened.filter((signal) => insertSignal(ctx.db, signal)).length;
 }
 
 function loadFilings(ctx: RuleContext): LobbyFilingLike[] {
