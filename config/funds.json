@@ -1,0 +1,14 @@
+{
+  "funds": [
+    { "name": "Berkshire Hathaway", "cik": "1067983", "verify": "BERKSHIRE" },
+    { "name": "Pershing Square", "cik": "1336528", "verify": "PERSHING" },
+    { "name": "Appaloosa", "cik": "1656456", "verify": "APPALOOSA" },
+    { "name": "Baupost Group", "cik": "1061768", "verify": "BAUPOST" },
+    { "name": "Scion Asset Management", "cik": "1649339", "verify": "SCION" },
+    { "name": "Duquesne Family Office", "cik": "1536411", "verify": "DUQUESNE" },
+    { "name": "Third Point", "cik": "1040273", "verify": "THIRD POINT" },
+    { "name": "Greenlight Capital", "cik": "1079114", "verify": "GREENLIGHT" },
+    { "name": "Coatue Management", "cik": "1135730", "verify": "COATUE" },
+    { "name": "Altimeter Capital", "cik": "1541617", "verify": "ALTIMETER" }
+  ]
+}

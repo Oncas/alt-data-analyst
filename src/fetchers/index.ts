@@ -18,17 +18,17 @@ export interface Fetcher {
 }
 
 import { congressFetcher } from "./congress.js";
+import { edgar13fFetcher } from "./edgar13f.js";
 import { edgarForm4Fetcher } from "./edgarForm4.js";
 import { ldaFetcher } from "./lda.js";
 import { tickersFetcher } from "./tickers.js";
 import { usaspendingFetcher } from "./usaspending.js";
 
-// Registered as each source lands (PLAN.md phases 2-5):
-// usaspending, lda, edgar-form4, congress, edgar-13f
 export const fetchers: Fetcher[] = [
   usaspendingFetcher,
   ldaFetcher,
   edgarForm4Fetcher,
   congressFetcher,
   tickersFetcher,
+  edgar13fFetcher,
 ];

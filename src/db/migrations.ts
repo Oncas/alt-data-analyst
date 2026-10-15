@@ -147,4 +147,23 @@ export const migrations: Migration[] = [
       );
     `,
   },
+  {
+    id: 7,
+    sql: `
+      CREATE TABLE fund_holdings (
+        id INTEGER PRIMARY KEY,
+        fund TEXT NOT NULL,
+        cik TEXT NOT NULL,
+        period TEXT NOT NULL,
+        issuer TEXT NOT NULL,
+        cusip TEXT NOT NULL,
+        value_usd REAL,
+        shares REAL,
+        fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (cik, period, cusip)
+      );
+
+      CREATE INDEX idx_fund_holdings_fund_period ON fund_holdings (cik, period);
+    `,
+  },
 ];
