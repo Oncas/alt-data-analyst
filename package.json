@@ -7,6 +7,7 @@
     "fetch": "tsx src/cli.ts fetch",
     "screen": "tsx src/cli.ts screen",
     "report": "tsx src/cli.ts report",
+    "ticker": "tsx src/cli.ts ticker",
     "typecheck": "tsc --noEmit",
     "test": "vitest run"
   },

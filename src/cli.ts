@@ -8,6 +8,7 @@ import {
   markSignalsReported,
   unreportedSignals,
 } from "./report/digest.js";
+import { tickerView } from "./report/tickerView.js";
 import { rules } from "./screen/index.js";
 import { todayIso } from "./util/dates.js";
 
@@ -85,6 +86,14 @@ switch (command) {
   case "report":
     runReport();
     break;
+  case "ticker": {
+    if (!target) {
+      console.error("Usage: npm run ticker -- <SYMBOL>");
+      process.exit(1);
+    }
+    console.log(tickerView(openDb(config.DB_PATH), target));
+    break;
+  }
   default:
     usage();
 }
