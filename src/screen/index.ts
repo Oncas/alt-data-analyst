@@ -15,13 +15,14 @@ export interface Rule {
 
 import { congressRules } from "./congress.js";
 import { contractRules } from "./contracts.js";
+import { fundRules } from "./funds.js";
 import { insiderRules } from "./insiders.js";
 import { lobbyingRules } from "./lobbying.js";
 
-// Registered as each source's rules land (PLAN.md phases 2-5).
 export const rules: Rule[] = [
   ...contractRules,
   ...lobbyingRules,
   ...insiderRules,
   ...congressRules,
+  ...fundRules,
 ];
