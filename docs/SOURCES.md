@@ -79,3 +79,69 @@ before relying on it after ~2026-Q4.
   Lambda Finance (50 calls/mo free cap), House/Senate Stock Watcher (dead).
 - **Risk:** kadoa is a third-party repo that could stop refreshing — the fetcher should
   alert (not fail silently) if the dataset's newest filing_date goes stale by >7 days.
+
+## 5. Daily price history — Yahoo Finance chart API
+
+Verified against live responses on 2026-07-22 (AAPL, LEU, AGX, SRFM, BRK-B).
+
+- **Base URL:** `https://query1.finance.yahoo.com/v8/finance/chart`
+  (`query2.` is an equivalent alias — same payload, useful if one host misbehaves).
+- **Endpoint:** `GET /v8/finance/chart/{SYMBOL}?range={range}&interval=1d`.
+  Ranges used here: `1y` on first sight of a ticker, `1mo` for daily incremental runs.
+  Valid ranges: `1d,5d,1mo,3mo,6mo,1y,2y,5y,10y,ytd,max`.
+- **Auth:** none — no API key, no login, no crumb/cookie for *this* endpoint
+  (unlike `/v7/finance/download`, which was retired, and the `quoteSummary` endpoints,
+  which do require a crumb).
+- **⚠ User-Agent is mandatory.** A bare client (curl/undici default) gets
+  `429 "Edge: Too Many Requests"` from the CDN *regardless of request volume* — this is
+  bot detection, not throttling. Send a normal browser UA and it returns 200 immediately.
+- **Rate limits:** none documented. 12 back-to-back requests with no delay all returned
+  200 in testing; we still space requests ~250 ms. Treat a 429 as per-ticker and skip,
+  since it may be transient edge throttling.
+- **Run sizing:** one request per ticker per day. The candidate set is signal tickers
+  plus congress/insider names traded in the last 90 days — measured 2026-07-22 that is
+  ~453 tickers (38 of them from `signals`), so ~3-5 min per daily run. A 400-ticker cap
+  bounds the worst case; overflow rotates (never-priced and stalest first) so no ticker
+  starves, and signal tickers always outrank trade tickers.
+- **Response shape:** `chart.result[0]` with
+  `meta` (`currency`, `gmtoffset`, `exchangeTimezoneName`, `regularMarketTime`,
+  `currentTradingPeriod.regular.{start,end}`), a parallel `timestamp[]` array, and
+  `indicators.quote[0].{open,high,low,close,volume}[]` plus
+  `indicators.adjclose[0].adjclose[]`. Errors come back as
+  `{"chart":{"result":null,"error":{"code":"Not Found","description":"No data found, symbol may be delisted"}}}`
+  with HTTP **404** — clean to detect per ticker.
+- **Freshness:** intraday. The last bar is the *current* session and updates tick by tick.
+- **Gotchas:**
+  - **The final bar is live, not settled.** Mid-session its `close` is the last trade and
+    it changes between calls (observed 323.78 → 323.86 seconds apart). Because we dedupe
+    with `INSERT OR IGNORE`, writing it would freeze a mid-session quote as that day's
+    close permanently. The fetcher drops any bar belonging to the in-progress session
+    (`regularMarketTime < currentTradingPeriod.regular.end`) and picks it up settled the
+    next run. So the newest stored date is normally *yesterday* during market hours.
+  - **Timestamps are session-open instants in UTC** (13:30Z = 09:30 ET), not midnight.
+    Convert with `meta.gmtoffset` to get the exchange-local trading date; a naive UTC
+    date happens to agree for US equities but breaks for other venues.
+  - **Share classes use a dash**, e.g. `BRK-B`. `BRK.B` returns 404. This matches SEC's
+    `company_tickers.json` spelling, but congressional filings sometimes use dots, so
+    the fetcher folds `.` → `-`.
+  - `close` entries can be `null` on halted/padded days — drop those bars, never
+    carry a price forward.
+  - Unofficial/undocumented API: it has been stable for years and is what most
+    open-source finance libraries use, but there is no contract. If it dies, the
+    fallback is Stooq (below) or an API-keyed source such as Alpha Vantage/Tiingo.
+- **Licensing:** undocumented endpoint backing a public site; Yahoo's ToS permit personal,
+  non-commercial use, and quotes are attributed to Yahoo Finance. Fine for personal
+  research at this volume. Revisit — and move to a licensed feed — before any
+  redistribution or commercial use.
+
+### Rejected alternative: Stooq CSV
+
+`https://stooq.com/q/d/l/?s=aapl.us&i=d` was the first choice (documented as a plain
+unauthenticated CSV of daily OHLC). **As of 2026-07-22 it is unusable from a script:**
+both `stooq.com` and `stooq.pl` now answer with an HTML interstitial that runs a
+SHA-256 proof-of-work in JavaScript and posts to `/__verify` before serving data
+(`"This site requires JavaScript to verify your browser"`). A browser User-Agent,
+`Accept: text/csv`, and a matching `Referer` all still hit the wall — solving it would
+mean running the PoW challenge, which is bot-detection circumvention. Re-check
+periodically; if the wall comes down, Stooq is a good failover since it needs no UA
+spoofing.

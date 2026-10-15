@@ -166,4 +166,21 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_fund_holdings_fund_period ON fund_holdings (cik, period);
     `,
   },
+  {
+    id: 8,
+    sql: `
+      CREATE TABLE prices (
+        id INTEGER PRIMARY KEY,
+        ticker TEXT NOT NULL,
+        date TEXT NOT NULL,
+        open REAL,
+        high REAL,
+        low REAL,
+        close REAL NOT NULL,
+        volume REAL,
+        fetched_at TEXT NOT NULL DEFAULT (datetime('now')),
+        UNIQUE (ticker, date)
+      );
+    `,
+  },
 ];

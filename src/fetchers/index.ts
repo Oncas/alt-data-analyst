@@ -21,6 +21,7 @@ import { congressFetcher } from "./congress.js";
 import { edgar13fFetcher } from "./edgar13f.js";
 import { edgarForm4Fetcher } from "./edgarForm4.js";
 import { ldaFetcher } from "./lda.js";
+import { pricesFetcher } from "./prices.js";
 import { tickersFetcher } from "./tickers.js";
 import { usaspendingFetcher } from "./usaspending.js";
 
@@ -31,4 +32,6 @@ export const fetchers: Fetcher[] = [
   congressFetcher,
   tickersFetcher,
   edgar13fFetcher,
+  // Last: prices only covers tickers the sources above have already surfaced.
+  pricesFetcher,
 ];
