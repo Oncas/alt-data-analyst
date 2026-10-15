@@ -136,4 +136,15 @@ export const migrations: Migration[] = [
       CREATE INDEX idx_congress_filer ON congress_trades (filer_name);
     `,
   },
+  {
+    id: 6,
+    sql: `
+      CREATE TABLE company_tickers (
+        normalized_name TEXT PRIMARY KEY,
+        ticker TEXT NOT NULL,
+        cik TEXT,
+        title TEXT
+      );
+    `,
+  },
 ];
