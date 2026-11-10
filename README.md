@@ -115,4 +115,5 @@ per-ticker view work, with 165 passing tests. Known gaps:
 ## Docs
 
 - [docs/SOURCES.md](docs/SOURCES.md) - endpoints, auth, rate limits and quirks
+- [docs/REPORTING.md](docs/REPORTING.md) - how a weekly report is written
 - [docs/DECISIONS.md](docs/DECISIONS.md) - design decisions, open and resolved

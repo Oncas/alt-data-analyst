@@ -89,8 +89,8 @@ const RULE_TIERS: Readonly<Record<string, Tier>> = {
 const CONFIRMATION_PREFIXES = ["contracts.", "lobbying."];
 
 /**
- * Tier for a rule. Never throws and never returns undefined: a rule added by
- * another agent (or an old rule name replayed out of the signals table) still
+ * Tier for a rule. Never throws and never returns undefined: a rule added
+ * later (or an old rule name replayed out of the signals table) still
  * gets a section rather than crashing or vanishing from the digest.
  */
 export function tierFor(rule: string): Tier {

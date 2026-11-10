@@ -30,7 +30,7 @@ async function runFetch(): Promise<void> {
   }
   if (selected.length === 0) {
     console.log(`Database ready at ${config.DB_PATH}.`);
-    console.log("No fetchers registered yet — sources land in PLAN.md phases 2-5.");
+    console.log("No fetchers registered.");
     return;
   }
   for (const fetcher of selected) {
@@ -52,7 +52,7 @@ async function runFetch(): Promise<void> {
 function runScreen(): void {
   const db = openDb(config.DB_PATH);
   if (rules.length === 0) {
-    console.log("No screening rules registered yet — rules land in PLAN.md phases 2-5.");
+    console.log("No screening rules registered.");
     return;
   }
   for (const rule of rules) {
